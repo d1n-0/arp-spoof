@@ -7,7 +7,7 @@
 #include "ethhdr.h"
 #include "arphdr.h"
 #include "util.h"
-#include "attack.cpp"
+#include "attack.h"
 
 static volatile bool running = true;
 
@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        RelayPacketArgs relay_packet_args = { &running, dev, &attacker_mac, &sender_mac, &target_ip };
+        RelayPacketArgs relay_packet_args = { &running, dev, &attacker_mac, &sender_mac };
         if (pthread_create(&threads[i+1], NULL, relayPacket, (void *)&relay_packet_args)) {
             fprintf(stderr, "pthread_create error\n");
             return -1;

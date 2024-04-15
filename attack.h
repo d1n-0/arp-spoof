@@ -21,7 +21,7 @@ struct RelayPacketArgs {
     char *dev;
     Mac *attacker_mac;
     Mac *sender_mac;
-    Ip *target_ip;
+    // Mac *target_mac;
 };
 
 void *sendArpReply(void *args);
