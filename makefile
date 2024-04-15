@@ -13,11 +13,13 @@ ip.o: ip.h ip.cpp
 
 mac.o : mac.h mac.cpp
 
+iphdr.o: ip.h iphdr.h iphdr.cpp
+
 util.o: util.h util.cpp
 
 attack.o: attack.h attack.cpp
 
-arp-spoof: main.o arphdr.o ethhdr.o ip.o mac.o util.o attack.o
+arp-spoof: main.o arphdr.o ethhdr.o iphdr.o ip.o mac.o util.o attack.o
 	$(LINK.cc) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 clean:
