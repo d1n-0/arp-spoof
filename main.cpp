@@ -4,12 +4,22 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <chrono>
+#include <mutex>
+#include <thread>
+#include <queue>
+#include <vector>
+#include <map>
+#include <utility>
+#include <condition_variable>
+
 #include "ethhdr.h"
 #include "arphdr.h"
 #include "util.h"
 #include "attack.h"
 
 static volatile bool running = true;
+std::condition_variable cv;
 
 void usage();
 void signal_handler(int signal);
@@ -18,8 +28,15 @@ int main(int argc, char* argv[]) {
     char *dev;
     Mac attacker_mac;
     Ip attacker_ip;
-    pthread_t *threads;
 
+    std::vector<std::thread> infectors;
+    std::vector<std::thread> relayers;
+    std::thread receiver;
+    std::mutex m;
+
+    IpMap queue_pair;
+    
+    std::vector<PacketQueue> packet_queue;
 
     if (argc < 4 || argc % 2 != 0) {
         usage();
@@ -27,6 +44,7 @@ int main(int argc, char* argv[]) {
     }
 
     dev = argv[1];
+    int pair_count = (argc - 2) / 2;
 
     if (
         getMacFromInterface(dev, &attacker_mac) ||
@@ -37,15 +55,10 @@ int main(int argc, char* argv[]) {
     }
 
     signal(SIGINT, signal_handler);
-    threads = (pthread_t *)malloc(sizeof(pthread_t) * (argc - 2));
-    if (threads == NULL) {
-        fprintf(stderr, "malloc error\n");
-        return -1;
-    }
 
-    for (int i = 2; i < argc; i += 2) {
-        Ip sender_ip = Ip(argv[i]);
-        Ip target_ip = Ip(argv[i + 1]);
+    for (int i = 0; i < pair_count; i++) {
+        Ip sender_ip = Ip(argv[i*2+2]);
+        Ip target_ip = Ip(argv[i*2+3]);
         Mac sender_mac;
         Mac target_mac;
         if (getMacFromIP(dev, &attacker_mac, &attacker_ip, &sender_ip, &sender_mac)) {
@@ -57,23 +70,29 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        SendArpReplyArgs send_arp_reply_args = { &running, dev, &attacker_mac, &attacker_ip, &sender_mac, &sender_ip, &target_mac, &target_ip };
-        if (pthread_create(&threads[i], NULL, sendArpReply, (void *)&send_arp_reply_args)) {
-            fprintf(stderr, "pthread_create error\n");
-            return -1;
-        }
+        int sender_to_target_idx = packet_queue.size();
+        queue_pair[std::make_pair(sender_ip, target_ip)] = sender_to_target_idx;
+        packet_queue.push_back(PacketQueue());
 
-        RelayPacketArgs relay_packet_args = { &running, dev, &attacker_mac, &sender_mac, &sender_ip, &target_mac };
-        if (pthread_create(&threads[i+1], NULL, relayPacket, (void *)&relay_packet_args)) {
-            fprintf(stderr, "pthread_create error\n");
-            return -1;
-        }
+        int target_to_sender_idx = packet_queue.size();
+        queue_pair[std::make_pair(target_ip, sender_ip)] = target_to_sender_idx;
+        packet_queue.push_back(PacketQueue());
+
+        infectors.push_back(std::thread(arp_infect, dev, &attacker_mac, &attacker_ip, &sender_mac, &sender_ip, &target_mac, &target_ip, &running));
+        relayers.push_back(std::thread(relay_packet, dev, &attacker_mac, &sender_mac, &sender_ip, &target_mac, sender_to_target_idx, target_to_sender_idx, &packet_queue, &running, &m, &cv));
     }
 
-    for (int i = 2; i < argc; i++) {
-        pthread_join(threads[i], NULL);
+    receiver = std::thread(receive_packet, dev, &running, &packet_queue, &queue_pair, &m, &cv);
+    while (running) {}
+    cv.notify_all();
+
+    for (int i = 0; i < pair_count; i++) {
+        infectors[i].join();
+        relayers[i].join();
     }
-    free(threads);
+    receiver.join();
+
+    return 0;
 }
 
 void usage() {
@@ -83,4 +102,6 @@ void usage() {
 
 void signal_handler(int signal) {
     running = false;
+    cv.notify_all();
+    printf("Signal %d received\n", signal);
 }

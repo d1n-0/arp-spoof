@@ -82,21 +82,23 @@ int getMacFromIP(char* dev, Mac* smac, Ip* sip, Ip* tip, Mac* tmac) {
         return -1;
     }
 
-    EthArpPacket packet;
+    // EthArpPacket packet;
 
-    packet.eth_.dmac_ = Mac("ff:ff:ff:ff:ff:ff");
-    packet.eth_.smac_ = *smac;
-    packet.eth_.type_ = htons(EthHdr::Arp);
+    // packet.eth_.dmac_ = Mac("ff:ff:ff:ff:ff:ff");
+    // packet.eth_.smac_ = *smac;
+    // packet.eth_.type_ = htons(EthHdr::Arp);
 
-    packet.arp_.hrd_ = htons(ArpHdr::ETHER);
-    packet.arp_.pro_ = htons(EthHdr::Ip4);
-    packet.arp_.hln_ = Mac::SIZE;
-    packet.arp_.pln_ = Ip::SIZE;
-    packet.arp_.op_ = htons(ArpHdr::Request);
-    packet.arp_.smac_ = *smac;
-    packet.arp_.sip_ = htonl(*sip);
-    packet.arp_.tmac_ = Mac("00:00:00:00:00:00");
-    packet.arp_.tip_ = htonl(*tip);
+    // packet.arp_.hrd_ = htons(ArpHdr::ETHER);
+    // packet.arp_.pro_ = htons(EthHdr::Ip4);
+    // packet.arp_.hln_ = Mac::SIZE;
+    // packet.arp_.pln_ = Ip::SIZE;
+    // packet.arp_.op_ = htons(ArpHdr::Request);
+    // packet.arp_.smac_ = *smac;
+    // packet.arp_.sip_ = htonl(*sip);
+    // packet.arp_.tmac_ = Mac("00:00:00:00:00:00");
+    // packet.arp_.tip_ = htonl(*tip);
+
+    EthArpPacket packet = EthArpPacket(Mac("ff:ff:ff:ff:ff:ff"), *smac, ArpHdr::Request, *smac, *sip, Mac("00:00:00:00:00:00"), *tip);
 
     int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
     if (res != 0) {
